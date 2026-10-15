@@ -1,22 +1,51 @@
 """
 Lanceur Principal du Bot de Trading Quantitatif SMC (Smart Money Concepts).
 Surveille en continu les marchés, détecte les anomalies de liquidité FVG/OB,
-gère les positions simulées (Paper Trading) et envoie les ordres sur Discord.
+gère les positions simulées (Paper Trading), envoie les ordres sur Discord
+et héberge le Journal de Trading & Bilan de Performance Web en direct.
 """
 
 import os
+import json
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import time
 import logging
 from datetime import datetime
 
+import config
+from market_data import MarketDataProvider
+from smc_engine import SMCEngine
+from risk_engine import RiskEngine
+from discord_notifier import DiscordNotifier
+from trade_tracker import tracker
+from dashboard_template import render_dashboard_html
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(b'{"status": "online", "bot": "SMC Quant Bot", "message": "Bot is scanning markets 24/7"}')
+        parsed_path = self.path.split('?')[0]
+
+        if parsed_path in ['/api/stats', '/api/trades']:
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            analytics = tracker.get_analytics()
+            self.wfile.write(json.dumps(analytics, ensure_ascii=False).encode('utf-8'))
+
+        elif parsed_path == '/health':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(b'{"status": "online", "bot": "SMC Quant Bot", "message": "Bot is scanning markets 24/7"}')
+
+        else:
+            # Servir le Dashboard Web complet
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
+            self.end_headers()
+            html_content = render_dashboard_html()
+            self.wfile.write(html_content.encode('utf-8'))
 
     def log_message(self, format, *args):
         pass  # Suppress access logs
@@ -25,12 +54,6 @@ def start_health_server():
     port = int(os.environ.get('PORT', 8080))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
-
-import config
-from market_data import MarketDataProvider
-from smc_engine import SMCEngine
-from risk_engine import RiskEngine
-from discord_notifier import DiscordNotifier
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,14 +77,25 @@ class SMCBotRunner:
         self.active_positions = {}
         self.capital = config.INITIAL_CAPITAL
 
+        # Restauration des positions actives depuis le journal si redémarrage
+        analytics = tracker.get_analytics()
+        for t in analytics.get('trades', []):
+            if t['status'] in ['ACTIVE', 'TP1_HIT']:
+                self.active_positions[t['symbol']] = {
+                    'params': t,
+                    'tp1_hit': t.get('tp1_hit', False),
+                    'entry_time': t['entry_time']
+                }
+
     def start(self):
         """Boucle principale d'analyse et de trading."""
         print("\n" + "=" * 70)
-        print("🤖 DÉMARRAGE DU BOT QUANTITATIF SMC CRYPTO")
+        print("🤖 DÉMARRAGE DU BOT QUANTITATIF SMC CRYPTO (AVEC JOURNAL WEB)")
         print(f"   Capital alloué   : {self.capital} €")
         print(f"   Risque par trade : {config.RISK_PERCENT}% ({self.risk.calculate_risk_amount()} € max)")
-        print(f"   Paires surveillées: {', '.join(config.PAIRS)}")
+        print(f"   Paires surveillées: {len(config.PAIRS)} paires ({', '.join(config.PAIRS[:5])}...)")
         print(f"   Timeframes       : {config.TIMEFRAME_MACRO} (Macro) & {config.TIMEFRAME_MICRO} (Anomalies)")
+        print(f"   Dashboard Web    : Actif sur le port {os.environ.get('PORT', 8080)}")
         print(f"   Discord Webhook  : {'Configuré ✅' if config.DISCORD_WEBHOOK_URL else 'Mode Console (aucun webhook) ⚠️'}")
         print("=" * 70 + "\n")
 
@@ -99,10 +133,13 @@ class SMCBotRunner:
                         # Calcul Risk Management
                         trade_params = self.risk.compute_position_parameters(setup)
                         if trade_params:
-                            # Envoi sur Discord & Console
+                            # 1. Enregistrement dans le Journal de Trading Tracker
+                            tracker.record_new_signal(trade_params)
+
+                            # 2. Envoi sur Discord & Console
                             self.notifier.send_trade_signal(trade_params)
 
-                            # Enregistrement en mémoire
+                            # 3. Enregistrement en mémoire
                             self.active_positions[symbol] = {
                                 'params': trade_params,
                                 'tp1_hit': False,
@@ -136,10 +173,12 @@ class SMCBotRunner:
                 if curr_price <= sl:
                     if pos['tp1_hit']:
                         gain = p['gain_tp1']
+                        tracker.update_trade_progress(symbol, 'SL_BE_HIT', curr_price, gain)
                         msg = f"🛡️ Position {symbol} fermée au Breakeven après TP1. Gain final sécurisé : +{gain} €."
                     else:
                         loss = p['risk_cash']
                         self.capital -= loss
+                        tracker.update_trade_progress(symbol, 'SL_LOSS_HIT', curr_price, loss)
                         msg = f"🛑 Stop Loss touché sur {symbol} à {curr_price}$. Perte maîtrisée : -{loss} €."
 
                     logging.info(msg)
@@ -152,6 +191,7 @@ class SMCBotRunner:
                     p['sl_price'] = p['entry_price'] # SL déplacé au Breakeven
                     gain = p['gain_tp1']
                     self.capital += gain
+                    tracker.update_trade_progress(symbol, 'TP1_HIT', curr_price, gain)
                     msg = f"🎯 TP1 ATTEINT sur {symbol} à {curr_price}$ ! (+{gain} € sécurisés sur 50%). Stop Loss déplacé au Breakeven ({p['entry_price']}$)."
                     logging.info(msg)
                     self.notifier.send_status_message(f"🎯 TP1 Atteint : {symbol}", msg, color=0x10B981)
@@ -161,16 +201,17 @@ class SMCBotRunner:
                     gain_tp2 = p['gain_tp2']
                     self.capital += gain_tp2
                     total_gain = p['total_projected_profit']
+                    tracker.update_trade_progress(symbol, 'TP2_HIT', curr_price, total_gain)
                     msg = f"🚀 TP2 FINAL ATTEINT sur {symbol} à {curr_price}$ ! Gain total du trade : +{total_gain} €. Capital actuel : {self.capital:.2f} €."
                     logging.info(msg)
                     self.notifier.send_status_message(f"🏆 TP2 Final Validé : {symbol}", msg, color=0xF59E0B)
                     del self.active_positions[symbol]
 
 if __name__ == '__main__':
-    # Démarre le serveur HTTP pour compatibilité Cloud Render (Free Web Service)
+    # Démarre le serveur HTTP du Dashboard Web & Healthcheck
     http_thread = threading.Thread(target=start_health_server, daemon=True)
     http_thread.start()
-    logging.info(f"Serveur HTTP de santé en écoute sur le port {os.environ.get('PORT', 8080)} (Render)")
+    logging.info(f"Serveur Web & Journal de Trading en écoute sur le port {os.environ.get('PORT', 8080)} (Render)")
 
     runner = SMCBotRunner()
     runner.start()
