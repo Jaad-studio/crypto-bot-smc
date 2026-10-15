@@ -21,10 +21,19 @@ ATR_SL_MULTIPLIER = 1.5 # Distance Stop Loss = 1.5 x ATR(14) 15m
 
 # --- ACTIFS ET TIMEFRAMES ---
 PAIRS = [
-    'SOL/USDT',
-    'AVAX/USDT',
-    'INJ/USDT',
-    'BTC/USDT'
+    'BTC/USDT',   # Boussole macro et valeur sûre
+    'SOL/USDT',   # Ultra-liquide
+    'AVAX/USDT',  # Très propre sur les FVG
+    'INJ/USDT',   # Volatilité asymétrique forte
+    'SUI/USDT',   # Momentum très puissant
+    'NEAR/USDT',  # Fortes amplitudes intraday
+    'APT/USDT',   # Mouvements vifs
+    'TAO/USDT',   # Secteur AI à forte volatilité
+    'FET/USDT',   # Secteur AI très réactif
+    'WIF/USDT',   # Memecoin très volatil (variations rapides)
+    'PEPE/USDT',  # Memecoin ultra-spéculatif
+    'DOGE/USDT',  # Gros volumes et mèches rapides
+    'LINK/USDT'   # Institutionnel dynamique
 ]
 
 TIMEFRAME_MACRO = '1h'  # Tendance institutionnelle macro (Market Structure)
