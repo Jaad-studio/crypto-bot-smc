@@ -1,0 +1,15 @@
+name: Keep Render Bot Awake 24/7
+
+on:
+  schedule:
+    # Run every 10 minutes to prevent Render free tier from sleeping
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Bot Health Endpoint
+        run: |
+          curl -s -f https://crypto-bot-smc.onrender.com/health || echo "Ping attempted"
