@@ -34,48 +34,38 @@ class DiscordNotifier:
         pattern = trade_params['pattern']
 
         embed = {
-            "title": f"{icon} SIGNAL ALGORITHMIQUE : {direction} SUR {symbol}",
-            "description": f"**Zone institutionnelle détectée :** `{pattern}`\n**Exécution recommandée :** Ordre Limit (Maker 0% frais)",
-            "color": color,
+            "title": f"🟢 SIGNAL ACHAT SPOT (BINANCE) : ACHETER {symbol}",
+            "description": f"**Stratégie :** Achat Spot SMC `{pattern}` (Sans levier, 100% sécurisé)\n**Marché :** Binance Spot `{symbol}`",
+            "color": 0x10B981,
             "fields": [
                 {
-                    "name": "🎯 Entrée Maker (Limit)",
-                    "value": f"`{entry}`",
+                    "name": "🎯 Prix d'Achat (Limit)",
+                    "value": f"**{entry} $**",
                     "inline": True
                 },
                 {
-                    "name": "🛑 Stop Loss",
-                    "value": f"`{sl}`",
+                    "name": "🛑 Stop Loss (Sécurité)",
+                    "value": f"**{sl} $**",
                     "inline": True
                 },
                 {
-                    "name": "📊 Risque Max Perte",
-                    "value": f"**-{risk_cash} €** (Risque maîtrisé)",
+                    "name": "💰 TP1 (Prendre 50% gains)",
+                    "value": f"**{tp1} $**",
                     "inline": True
                 },
                 {
-                    "name": "💰 TP1 (Vendre 50% + Breakeven)",
-                    "value": f"`{tp1}` (+{trade_params['gain_tp1']} €)",
+                    "name": "🚀 TP2 (Objectif Final)",
+                    "value": f"**{tp2} $**",
                     "inline": True
                 },
                 {
-                    "name": "🚀 TP2 (Final Runner 50%)",
-                    "value": f"`{tp2}` (+{trade_params['gain_tp2']} €)",
-                    "inline": True
-                },
-                {
-                    "name": "🏆 Profit Total Projeté",
-                    "value": f"**+{profit} €** (R:R {trade_params['risk_reward_ratio']}x)",
-                    "inline": True
-                },
-                {
-                    "name": "📦 Position Sizing (Capital 300 €)",
-                    "value": f"Quantité : `{quantity}` {symbol.split('/')[0]}\nValeur notionnelle : `{notional} $`\nLevier suggéré : `x{lev}`",
+                    "name": "📱 Comment placer l'ordre sur ton application Binance :",
+                    "value": f"1. Ouvre Binance ➔ Onglet **Trader** en bas ➔ **Spot** en haut\n2. En haut à gauche, tape et choisis `{symbol}`\n3. Clique sur le bouton vert **Acheter**\n4. Coche la case **TP/SL** :\n   • Dans TP tape : `{tp1}`\n   • Dans SL tape : `{sl}`\n5. Mets ta mise (ex: 25 € en USDT) et clique sur **Acheter** !",
                     "inline": False
                 }
             ],
             "footer": {
-                "text": "SMC Quant Bot • Discipline & Risk Management",
+                "text": "SMC Quant Bot • Mode Binance Spot France • 100% Achats Sécurisés",
             },
             "timestamp": datetime.utcnow().isoformat()
         }

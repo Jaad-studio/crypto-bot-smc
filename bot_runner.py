@@ -64,7 +64,7 @@ logging.basicConfig(
 class SMCBotRunner:
     def __init__(self):
         self.provider = MarketDataProvider(exchange_id=config.EXCHANGE_ID, exchange_type=config.EXCHANGE_TYPE)
-        self.smc = SMCEngine(atr_multiplier=config.ATR_SL_MULTIPLIER)
+        self.smc = SMCEngine(atr_multiplier=config.ATR_SL_MULTIPLIER, allow_short=getattr(config, 'ALLOW_SHORT', False))
         self.risk = RiskEngine(
             initial_capital=config.INITIAL_CAPITAL,
             risk_mode=config.RISK_MODE,
@@ -133,6 +133,12 @@ class SMCBotRunner:
                         # Calcul Risk Management
                         trade_params = self.risk.compute_position_parameters(setup)
                         if trade_params:
+                            # Sécurité types natifs Python pour JSON et Discord
+                            clean_params = {}
+                            for k, v in trade_params.items():
+                                clean_params[k] = v.item() if hasattr(v, 'item') else v
+                            trade_params = clean_params
+
                             # 1. Enregistrement dans le Journal de Trading Tracker
                             tracker.record_new_signal(trade_params)
 

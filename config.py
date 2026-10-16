@@ -53,8 +53,9 @@ BTC_DUMP_THRESHOLD_1H = -1.8 # Si BTC chute de plus de -1.8% en 1H, gel de tous 
 
 # --- EXCHANGE & EXÉCUTION ---
 EXCHANGE_ID = 'binance' # Options : 'binance', 'bybit', 'bitget', 'kucoin'
-EXCHANGE_TYPE = 'swap'  # 'swap' (Futures / Contrats Perpétuels avec levier) ou 'spot'
-DEFAULT_LEVERAGE = 3    # Levier conservateur recommandé pour micro-capital (x2 à x5 max)
+EXCHANGE_TYPE = 'spot'  # 'spot' (Binance Spot sans levier, 100% conforme France)
+ALLOW_SHORT = False     # 100% Achats (LONG) uniquement, 0 Short
+DEFAULT_LEVERAGE = 1    # Spot classique (aucun effet de levier)
 
 # Clés API Exchange (Optionnel si mode ALERTE DISCORD / DRY RUN uniquement)
 API_KEY = os.getenv('EXCHANGE_API_KEY', '')

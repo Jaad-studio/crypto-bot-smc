@@ -8,8 +8,9 @@ import pandas as pd
 import numpy as np
 
 class SMCEngine:
-    def __init__(self, atr_multiplier=1.5):
+    def __init__(self, atr_multiplier=1.5, allow_short=False):
         self.atr_multiplier = atr_multiplier
+        self.allow_short = allow_short
 
     def analyze_market_structure_1h(self, df_1h):
         """
@@ -228,7 +229,7 @@ class SMCEngine:
                     }
 
         # --- SCÉNARIO SHORT (VENTE / DÉRIVÉS) ---
-        elif macro_trend == 'BEARISH' and recent_delta < 0:
+        elif self.allow_short and macro_trend == 'BEARISH' and recent_delta < 0:
             target_fvg = None
             for fvg in reversed(bearish_fvgs):
                 if current_price <= fvg['top'] and (fvg['bottom'] - current_price) / current_price < 0.025:

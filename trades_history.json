@@ -1,5 +1,31 @@
 {
   "initial_capital": 300.0,
-  "last_updated": "2026-10-16 01:43:12",
-  "trades": []
+  "last_updated": "2026-10-16 20:42:00",
+  "trades": [
+    {
+      "id": "tr_1792176120_NEAR",
+      "symbol": "NEAR/USDT",
+      "direction": "SHORT",
+      "entry_price": 4.988,
+      "sl_price": 5.1226,
+      "tp1_price": 4.7861,
+      "tp2_price": 4.5842,
+      "quantity": 111.4413,
+      "risk_cash": 15.0,
+      "gain_tp1": 11.25,
+      "gain_tp2": 22.5,
+      "total_projected_profit": 33.75,
+      "leverage_recommended": 2,
+      "pattern": "Bearish FVG [4.99 - 5.02]",
+      "entry_time": "2026-10-16 20:42:00",
+      "month": "2026-10",
+      "status": "ACTIVE",
+      "outcome": "EN COURS",
+      "exit_time": null,
+      "exit_price": null,
+      "pnl_eur": 0.0,
+      "tp1_hit": false,
+      "notes": "Ordre d'entrée recommandé à 4.988$ sur zone institutionnelle Bearish FVG [4.99 - 5.02]."
+    }
+  ]
 }
