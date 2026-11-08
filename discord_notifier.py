@@ -1,10 +1,7 @@
 """
-Module de Notification Discord Webhook Enrichi (Quantitative Alert Engine).
-Envoie des alertes JSON stylisées (Embeds) prêtes à exécuter avec :
-- Métriques quantitatives (Régime, Setup Quality, Confiance)
-- Dimensionnement de Kelly fractionnaire
-- Statut du Kill-Switch déterministe
-- Bilan nocturne de calibration (Brier Score)
+Module de Notification Discord Webhook Ultra-Clair & Pédagogique.
+Formate tous les messages dans un français simple, direct et sans jargon,
+pensé pour être lu et compris en 3 secondes sur l'application mobile Discord.
 """
 
 import requests
@@ -19,187 +16,165 @@ class DiscordNotifier:
 
     def send_trade_signal(self, trade_params: Dict[str, Any], regime_info: Optional[Dict[str, Any]] = None):
         """
-        Envoie un signal d'entrée institutionnel vers Discord avec couches quantitatives.
+        Envoie un signal d'achat/vente ultra-lisible avec instructions pas à pas.
         """
         direction = trade_params['direction']
         is_long = direction == 'LONG'
-        color = 0x10B981 if is_long else 0xEF4444
         symbol = trade_params['symbol']
+        crypto_name = symbol.split('/')[0]
         entry = trade_params['entry_price']
         sl = trade_params['sl_price']
         tp1 = trade_params['tp1_price']
         tp2 = trade_params['tp2_price']
-        quantity = trade_params['quantity']
         risk_cash = trade_params['risk_cash']
         notional = trade_params['notional_value']
-        pattern = trade_params['pattern']
+        confidence_pct = round(trade_params.get('confidence', 0.80) * 100, 1)
 
-        setup_quality = trade_params.get('setup_quality', 2.0)
-        confidence = trade_params.get('confidence', 0.80)
-        confidence_pct = round(confidence * 100, 1)
-        sizing_method = trade_params.get('sizing_method', 'Quarter-Kelly (0.25x)')
-        risk_state = trade_params.get('risk_state', 'SAFE').upper()
-        drawdown_pct = trade_params.get('current_drawdown_pct', 0.0)
+        action_word = "ACHETER" if is_long else "VENDRE (PARIER À LA BAISSE)"
+        color = 0x10B981 if is_long else 0xEF4444
 
-        regime_str = "TRENDING"
-        if regime_info:
-            regime_str = str(regime_info.get('regime', 'trending')).upper()
-
-        stars = "⭐️" * int(min(3, max(1, round(setup_quality))))
-
-        # Explication en français simple et vulgarisée
-        if is_long:
-            instruction_title = "💡 CE QUE LE BOT TE CONSEILLE DE FAIRE :"
-            instruction_text = (
-                f"1. **ACHÈTE** `{symbol}` sur Binance au prix de **`{entry} $`** (avec environ **`{notional} $`**).\n"
-                f"2. **METS TA SÉCURITÉ (Stop Loss) :** Si le cours baisse sous **`{sl} $`**, coupe tout (perte limitée à **`-{risk_cash} €`**).\n"
-                f"3. **PRENDS TES BÉNÉFICES (Étape 1) :** Quand le prix monte à **`{tp1} $`**, vends la moitié (50%) pour empocher **`+{trade_params['gain_tp1']} €`**.\n"
-                f"4. **PASSE EN RISQUE ZÉRO (Breakeven) :** Dès que l'étape 1 est validée, remonte ton Stop Loss à **`{entry} $`** (ton prix d'achat) : impossible de perdre le moindre centime !\n"
-                f"5. **OBJECTIF FINAL (Étape 2) :** Vends le reste quand le prix touche **`{tp2} $`** pour empocher **`+{trade_params['gain_tp2']} €`** de plus (Gain total : **`+{trade_params['total_projected_profit']} €`**)."
-            )
-        else:
-            instruction_title = "💡 CE QUE LE BOT TE CONSEILLE DE FAIRE (POSITION SHORT) :"
-            instruction_text = (
-                f"1. **VENDS (SHORT)** `{symbol}` à **`{entry} $`** en pariant sur la baisse.\n"
-                f"2. **METS TA SÉCURITÉ (Stop Loss) :** Si le cours remonte au-dessus de **`{sl} $`**, coupe la position (perte max: **`-{risk_cash} €`**).\n"
-                f"3. **SÉCURISE TES GAINS (Étape 1) :** Dès que le prix descend à **`{tp1} $`**, rachète la moitié pour empocher **`+{trade_params['gain_tp1']} €`**.\n"
-                f"4. **PASSE EN RISQUE ZÉRO :** Déplace aussitôt ton Stop Loss au prix de départ (**`{entry} $`**).\n"
-                f"5. **OBJECTIF FINAL (Étape 2) :** Rachète les 50% restants quand le prix chute à **`{tp2} $`** (Gain total : **`+{trade_params['total_projected_profit']} €`**)."
-            )
+        description = (
+            f"🔔 **Opportunité détectée par l'algorithme**\n"
+            f"Confiance estimée : **{confidence_pct}%**\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👉 **CE QUE TU DOIS FAIRE SUR BINANCE :**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"**1️⃣ ÉTAPE 1 : ENTRER EN POSITION**\n"
+            f"• Action : **{action_word} `{crypto_name}`**\n"
+            f"• Prix conseillé : **`{entry} $`** (ou au prix actuel)\n"
+            f"• Montant à mettre : environ **`{notional} $`**\n\n"
+            f"**2️⃣ ÉTAPE 2 : METTRE LA SÉCURITÉ (STOP LOSS)**\n"
+            f"• Si le prix touche **`{sl} $`**, vends tout.\n"
+            f"• *Ta perte sera bloquée à maximum **`-{risk_cash} €`**.*\n\n"
+            f"**3️⃣ ÉTAPE 3 : ENCAISSER LE PREMIER BÉNÉFICE**\n"
+            f"• Dès que le prix atteint **`{tp1} $`**, vends la moitié (50%).\n"
+            f"• *Tu empoches immédiatement **`+{trade_params['gain_tp1']} €`**.*\n"
+            f"• *Puis remonte ta sécurité au prix d'achat (**`{entry} $`**) : ton trade devient 100% gratuit sans aucun risque !*\n\n"
+            f"**4️⃣ ÉTAPE 4 : OBJECTIF FINAL**\n"
+            f"• Vends les 50% restants quand le cours touche **`{tp2} $`**.\n"
+            f"• *Gain total dans ta poche : **`+{trade_params['total_projected_profit']} €`**.*"
+        )
 
         embed = {
-            "title": f"🟢 SIGNAL ACHAT INSTITUTIONNEL : {symbol}",
-            "description": (
-                f"**Modèle :** Smart Money Concepts `{pattern}`\n"
-                f"**Régime Macro :** `{regime_str}` | **État du Risque :** `{risk_state}`"
-            ),
+            "title": f"{'🟢' if is_long else '🔴'} CONSEIL DU BOT : {action_word} {symbol}",
+            "description": description,
             "color": color,
-            "fields": [
-                {
-                    "name": "🎯 Prix d'Entrée (Limit)",
-                    "value": f"**{entry} $**",
-                    "inline": True
-                },
-                {
-                    "name": "🛑 Stop Loss (Strict)",
-                    "value": f"**{sl} $** (-{risk_cash} €)",
-                    "inline": True
-                },
-                {
-                    "name": "💰 TP1 (50% + Breakeven)",
-                    "value": f"**{tp1} $** (+{trade_params['gain_tp1']} €)",
-                    "inline": True
-                },
-                {
-                    "name": "🚀 TP2 (Objectif Final)",
-                    "value": f"**{tp2} $** (+{trade_params['total_projected_profit']} €)",
-                    "inline": True
-                },
-                {
-                    "name": "📊 Score IA & Calibration",
-                    "value": f"{stars} **{setup_quality}/3.0** (Confiance: **{confidence_pct}%**)",
-                    "inline": True
-                },
-                {
-                    "name": "📐 Taille Recommandée (Kelly)",
-                    "value": f"{sizing_method}\n**{risk_cash} €** risqués",
-                    "inline": True
-                },
-                {
-                    "name": instruction_title,
-                    "value": instruction_text,
-                    "inline": False
-                }
-            ],
             "footer": {
-                "text": "Antigravity Quant Architecture • Risk-First Trading Loop",
+                "text": "Trade assisté • Respecte toujours la sécurité (Stop Loss)",
             },
             "timestamp": datetime.utcnow().isoformat()
         }
 
         self._print_terminal_banner(trade_params)
+        return self._send_raw_embed(embed)
 
-        if not self.webhook_url:
-            logging.warning("Aucun Webhook Discord configuré. Alerte affichée en console uniquement.")
-            return False
+    def send_tp1_hit(self, symbol: str, current_price: float, gain: float, is_long: bool = True):
+        """Notification très claire du 1er objectif atteint."""
+        crypto_name = symbol.split('/')[0]
+        embed = {
+            "title": f"💰 1er OBJECTIF VALIDÉ : {crypto_name} (+{gain:.2f} €)",
+            "description": (
+                f"Le cours vient d'atteindre **`{current_price} $`** comme prévu !\n\n"
+                f"✅ **Ce qui s'est passé :**\n"
+                f"• Tu as sécurisé la moitié de tes gains (**`+{gain:.2f} €`** déjà dans la poche).\n"
+                f"• La sécurité a été déplacée au prix d'achat : **tu ne peux plus perdre le moindre centime sur ce trade (Risque Zéro)**.\n\n"
+                f"👉 **Ce que tu dois faire :**\n"
+                f"Rien du tout ! Laisse courir les 50% restants vers l'objectif final."
+            ),
+            "color": 0x10B981,
+            "footer": {"text": "Objectif 1/2 validé • Position désormais sans risque"},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        return self._send_raw_embed(embed)
 
-        try:
-            payload = {"embeds": [embed]}
-            res = requests.post(
-                self.webhook_url,
-                data=json.dumps(payload),
-                headers={"Content-Type": "application/json"},
-                timeout=10
-            )
-            return res.status_code in [200, 204]
-        except Exception as e:
-            logging.error(f"Erreur lors de l'envoi vers Discord : {e}")
-            return False
+    def send_tp2_hit(self, symbol: str, current_price: float, total_gain: float, capital: float, is_long: bool = True):
+        """Notification très claire du trade 100% réussi."""
+        crypto_name = symbol.split('/')[0]
+        embed = {
+            "title": f"🎉 TRADE 100% GAGNÉ : {crypto_name} (+{total_gain:.2f} €)",
+            "description": (
+                f"L'objectif final a été atteint à **`{current_price} $`** !\n\n"
+                f"🏆 **Bilan du trade :**\n"
+                f"• Gain total empoché : **`+{total_gain:.2f} €`** net.\n"
+                f"• Nouveau capital total : **`{capital:.2f} €`**.\n\n"
+                f"👉 **Ce que tu dois faire :**\n"
+                f"Rien, le trade est totalement terminé et fermé avec succès. En attente du prochain signal !"
+            ),
+            "color": 0xF59E0B,
+            "footer": {"text": "Succès complet • Capital sécurisé"},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        return self._send_raw_embed(embed)
+
+    def send_stop_loss_hit(self, symbol: str, current_price: float, loss: float, be_hit: bool = False):
+        """Notification claire si la position est coupée."""
+        crypto_name = symbol.split('/')[0]
+        if be_hit:
+            embed = {
+                "title": f"🛡️ Trade Clôturé au Breakeven : {crypto_name}",
+                "description": (
+                    f"Le cours est revenu au niveau d'achat initial à **`{current_price} $`**.\n\n"
+                    f"✅ **Bilan :**\n"
+                    f"Grâce à la sécurité remontée après le premier objectif, **tu ne perds rien du tout** et tu as conservé les gains de la première étape !"
+                ),
+                "color": 0x3B82F6,
+                "footer": {"text": "Protection du capital activée"},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            embed = {
+                "title": f"🛑 Sécurité Activée (Stop Loss) : {crypto_name} (-{loss:.2f} €)",
+                "description": (
+                    f"Le marché a tourné dans le mauvais sens et a touché la sécurité à **`{current_price} $`**.\n\n"
+                    f"🛡️ **Ce qui s'est passé :**\n"
+                    f"Le bot a coupé le trade automatiquement pour t'éviter une grosse chute.\n"
+                    f"Perte strictement maîtrisée : **`-{loss:.2f} €`**.\n\n"
+                    f"👉 **Ce que tu dois faire :**\n"
+                    f"Rien, la perte fait partie normale du trading. Le système attend un nouveau setup propre pour repartir."
+                ),
+                "color": 0xEF4444,
+                "footer": {"text": "Perte sous contrôle • Capital protégé"},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        return self._send_raw_embed(embed)
 
     def send_kill_switch_alert(self, reason: str, drawdown_pct: float, capital: float):
         """Alerte rouge d'urgence si le Kill-Switch déterministe se déclenche."""
         embed = {
-            "title": "🚨 VERROUILLAGE D'URGENCE (KILL-SWITCH DÉCLENCHÉ)",
+            "title": "🚨 VERROUILLAGE D'URGENCE (SÉCURITÉ MAXIMALE)",
             "description": (
-                f"**Le système a bloqué l'ouverture de tout nouvel ordre.**\n\n"
-                f"**Raison :** {reason}\n"
-                f"**Drawdown Actuel :** `{drawdown_pct}%` (Plafond infranchissable: 15%)\n"
-                f"**Capital restant :** `{capital:.2f} €`"
+                f"**Le bot a stoppé toutes les nouvelles prises de position.**\n\n"
+                f"**Pourquoi ?**\n{reason}\n\n"
+                f"**Capital actuel :** `{capital:.2f} €` (Baisse récente : `{drawdown_pct}%`)\n\n"
+                f"👉 **Ce que ça veut dire :**\n"
+                f"Le marché est trop dangereux ou a atteint la limite de perte autorisée. Le bot refuse d'ouvrir d'autres trades pour ne pas mettre ton compte en danger."
             ),
             "color": 0xFF0000,
-            "footer": {"text": "Protection Déterministe du Capital • Intervention Manuelle Requise"},
+            "footer": {"text": "Garde-fou automatique activé"},
             "timestamp": datetime.utcnow().isoformat()
         }
         self._send_raw_embed(embed)
 
     def send_overnight_review(self, metrics: Dict[str, Any]):
-        """Envoie le bilan nocturne de calibration Brier Score sur Discord."""
+        """Envoie le bilan nocturne dans un format clair."""
         if metrics.get('status') != 'success':
             return
 
         embed = {
-            "title": "🌙 Bilan Nocturne & Calibration Statistique (Brier Score)",
-            "description": f"Revue automatique des performances et de la calibration du modèle.",
+            "title": "🌙 Bilan du Soir : Vos Performances",
+            "description": (
+                f"Voici le résumé des trades analysés aujourd'hui :\n\n"
+                f"• **Trades gagnants :** {metrics['wins']} / {metrics['total_trades_analyzed']} (Taux de réussite : **{metrics['win_rate_pct']}%**)\n"
+                f"• **Bénéfice Net Total :** **`{metrics['total_pnl_eur']:+.2f} €`**\n"
+                f"• **Qualité des prédictions (Brier Score) :** `{metrics['brier_score']}` (*{metrics['calibration_grade']}*)"
+            ),
             "color": 0x6366F1,
-            "fields": [
-                {
-                    "name": "🎯 Brier Score (Calibration)",
-                    "value": f"**`{metrics['brier_score']}`**\n*{metrics['calibration_grade']}*",
-                    "inline": True
-                },
-                {
-                    "name": "📈 Win Rate (Taux Réussite)",
-                    "value": f"**{metrics['win_rate_pct']}%** ({metrics['wins']}W / {metrics['losses']}L)",
-                    "inline": True
-                },
-                {
-                    "name": "💰 PnL Net Total",
-                    "value": f"**{metrics['total_pnl_eur']:+.2f} €**",
-                    "inline": True
-                },
-                {
-                    "name": "⚖️ Profit Factor",
-                    "value": f"**{metrics['profit_factor']}**",
-                    "inline": True
-                },
-                {
-                    "name": "📊 Gains vs Pertes Moyens",
-                    "value": f"+{metrics['avg_gain_eur']} € / -{metrics['avg_loss_eur']} €",
-                    "inline": True
-                },
-                {
-                    "name": "🔬 Volume d'échantillons",
-                    "value": f"{metrics['total_trades_analyzed']} trades clôturés",
-                    "inline": True
-                }
-            ],
-            "footer": {"text": "Auto-Correction Nocturne • Compound Loop"},
+            "footer": {"text": "Bilan automatique 24/7"},
             "timestamp": datetime.utcnow().isoformat()
         }
         self._send_raw_embed(embed)
 
     def send_status_message(self, title, message, color=0x3B82F6):
-        """Envoie un message informatif (breakeven, sortie, alerte)."""
         embed = {
             "title": title,
             "description": message,
@@ -221,23 +196,9 @@ class DiscordNotifier:
 
     def _print_terminal_banner(self, p):
         print("\n" + "=" * 65)
-        print(f"🚨 [NOUVEAU SIGNAL DÉTECTÉ] {p['direction']} sur {p['symbol']}")
-        print(f"   Score & Confiance   : {p.get('setup_quality', 2.0)}/3.0 ({round(p.get('confidence', 0.8)*100, 1)}%)")
+        print(f"🚨 [NOUVEAU SIGNAL] {p['direction']} sur {p['symbol']}")
         print(f"   Prix Entrée (Limit) : {p['entry_price']} $")
         print(f"   Stop Loss           : {p['sl_price']} $ (Perte max : -{p['risk_cash']} €)")
-        print(f"   Take Profit 1       : {p['tp1_price']} $ (Sécurise 50% + SL à Breakeven)")
-        print(f"   Take Profit 2       : {p['tp2_price']} $ (Objectif final : +{p['total_projected_profit']} €)")
-        print(f"   Sizing (Kelly 0.25x): {p['risk_cash']} € risqués ({p.get('notional_value')} $ notionnel)")
-        print("   ---")
-        print(f"   💡 CONSEIL SIMPLE :")
-        if p['direction'] == 'LONG':
-            print(f"   1. Achète {p['symbol']} à {p['entry_price']}$")
-            print(f"   2. Mets le Stop Loss à {p['sl_price']}$")
-            print(f"   3. Dès que ça atteint {p['tp1_price']}$, vends 50% et monte ton SL à {p['entry_price']}$ (risque 0)")
-            print(f"   4. Vends le reste quand ça atteint {p['tp2_price']}$ !")
-        else:
-            print(f"   1. Vends (Short) {p['symbol']} à {p['entry_price']}$")
-            print(f"   2. Mets le Stop Loss à {p['sl_price']}$")
-            print(f"   3. Dès que ça descend à {p['tp1_price']}$, rachète 50% et passe ton SL à {p['entry_price']}$")
-            print(f"   4. Rachète le reste quand ça descend à {p['tp2_price']}$ !")
+        print(f"   Take Profit 1       : {p['tp1_price']} $ (+{p.get('gain_tp1')} €)")
+        print(f"   Take Profit 2       : {p['tp2_price']} $ (+{p['total_projected_profit']} €)")
         print("=" * 65 + "\n", flush=True)

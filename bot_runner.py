@@ -281,16 +281,13 @@ class SMCBotRunner:
                         self.capital += gain
                         self.risk.update_capital(self.capital)
                         tracker.update_trade_progress(symbol, 'SL_BE_HIT', curr_price, gain)
-                        msg = f"🛡️ Position {symbol} fermée au Breakeven après TP1. Gain sécurisé : +{gain} €."
+                        self.notifier.send_stop_loss_hit(symbol, curr_price, gain, be_hit=True)
                     else:
                         loss = p['risk_cash']
                         self.capital -= loss
                         self.risk.update_capital(self.capital)
                         tracker.update_trade_progress(symbol, 'SL_LOSS_HIT', curr_price, -loss)
-                        msg = f"🛑 Stop Loss touché sur {symbol} à {curr_price}$. Perte maîtrisée : -{loss} €."
-
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"Sortie de position : {symbol}", msg, color=0xEF4444)
+                        self.notifier.send_stop_loss_hit(symbol, curr_price, loss, be_hit=False)
                     del self.active_positions[symbol]
 
                 # TP1 touché
@@ -301,9 +298,7 @@ class SMCBotRunner:
                     self.capital += gain
                     self.risk.update_capital(self.capital)
                     tracker.update_trade_progress(symbol, 'TP1_HIT', curr_price, gain)
-                    msg = f"🎯 TP1 ATTEINT sur {symbol} à {curr_price}$ ! (+{gain} € sécurisés). Stop Loss déplacé au Breakeven."
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"🎯 TP1 Atteint : {symbol}", msg, color=0x10B981)
+                    self.notifier.send_tp1_hit(symbol, curr_price, gain, is_long=True)
 
                 # TP2 final touché
                 elif pos['tp1_hit'] and curr_price >= tp2:
@@ -312,9 +307,7 @@ class SMCBotRunner:
                     self.risk.update_capital(self.capital)
                     total_gain = p['total_projected_profit']
                     tracker.update_trade_progress(symbol, 'TP2_HIT', curr_price, total_gain)
-                    msg = f"🚀 TP2 FINAL ATTEINT sur {symbol} à {curr_price}$ ! Gain total : +{total_gain} €. Capital actuel : {self.capital:.2f} €."
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"🏆 TP2 Final Validé : {symbol}", msg, color=0xF59E0B)
+                    self.notifier.send_tp2_hit(symbol, curr_price, total_gain, self.capital, is_long=True)
                     del self.active_positions[symbol]
 
             elif direction == 'SHORT':
@@ -325,16 +318,13 @@ class SMCBotRunner:
                         self.capital += gain
                         self.risk.update_capital(self.capital)
                         tracker.update_trade_progress(symbol, 'SL_BE_HIT', curr_price, gain)
-                        msg = f"🛡️ Position SHORT {symbol} fermée au Breakeven après TP1. Gain sécurisé : +{gain} €."
+                        self.notifier.send_stop_loss_hit(symbol, curr_price, gain, be_hit=True)
                     else:
                         loss = p['risk_cash']
                         self.capital -= loss
                         self.risk.update_capital(self.capital)
                         tracker.update_trade_progress(symbol, 'SL_LOSS_HIT', curr_price, -loss)
-                        msg = f"🛑 Stop Loss touché sur SHORT {symbol} à {curr_price}$. Perte maîtrisée : -{loss} €."
-
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"Sortie de position : {symbol}", msg, color=0xEF4444)
+                        self.notifier.send_stop_loss_hit(symbol, curr_price, loss, be_hit=False)
                     del self.active_positions[symbol]
 
                 # TP1 touché (prix baisse)
@@ -345,9 +335,7 @@ class SMCBotRunner:
                     self.capital += gain
                     self.risk.update_capital(self.capital)
                     tracker.update_trade_progress(symbol, 'TP1_HIT', curr_price, gain)
-                    msg = f"🎯 TP1 ATTEINT sur SHORT {symbol} à {curr_price}$ ! (+{gain} €). Stop Loss déplacé au Breakeven."
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"🎯 TP1 Atteint : {symbol}", msg, color=0x10B981)
+                    self.notifier.send_tp1_hit(symbol, curr_price, gain, is_long=False)
 
                 # TP2 final touché (prix baisse)
                 elif pos['tp1_hit'] and curr_price <= tp2:
@@ -356,9 +344,7 @@ class SMCBotRunner:
                     self.risk.update_capital(self.capital)
                     total_gain = p['total_projected_profit']
                     tracker.update_trade_progress(symbol, 'TP2_HIT', curr_price, total_gain)
-                    msg = f"🚀 TP2 FINAL ATTEINT sur SHORT {symbol} à {curr_price}$ ! Gain total : +{total_gain} €."
-                    logging.info(msg)
-                    self.notifier.send_status_message(f"🏆 TP2 Final Validé : {symbol}", msg, color=0xF59E0B)
+                    self.notifier.send_tp2_hit(symbol, curr_price, total_gain, self.capital, is_long=False)
                     del self.active_positions[symbol]
 
 if __name__ == '__main__':
