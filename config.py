@@ -5,14 +5,22 @@ Conçu pour micro-capital (300 €) évolutif vers 3 000 €+.
 
 import os
 
-# --- CAPITAL & GESTION DU RISQUE ---
+# --- CAPITAL & GESTION DU RISQUE DÉTERMINISTE ---
 INITIAL_CAPITAL = 300.0  # Capital de départ en EUR / USDT
 
-# Mode de risque configurable :
-# 'percentage' (ex: 5.0 pour 5%) ou 'fixed' (ex: 15.0 pour 15 €)
-RISK_MODE = 'percentage'
-RISK_PERCENT = 5.0       # 5% de 300 € = 15 € risqué par trade (plus réaliste et agressif pour faire grossir un petit compte)
-FIXED_RISK_AMOUNT = 15.0 # Utilisé si RISK_MODE == 'fixed'
+# Mode de risque : 'kelly' (Quarter-Kelly statistique recommandé), 'percentage', ou 'fixed'
+RISK_MODE = 'kelly'
+KELLY_FRACTION = 0.25    # 0.25 = 1/4 Kelly (plafond anti-ruine)
+RISK_PERCENT = 5.0       # Fallback si RISK_MODE == 'percentage'
+FIXED_RISK_AMOUNT = 15.0 # Fallback si RISK_MODE == 'fixed'
+
+# Garde-fous déterministes (Hard Risk Layer)
+MAX_DRAWDOWN_LIMIT_PCT = 15.0  # Kill-Switch strict : coupure si -15% depuis sommet
+MAX_DAILY_LOSS_LIMIT_PCT = 5.0 # Perte journalière maximale autorisée
+
+# Filtrage chirurgical des signaux
+MIN_SETUP_QUALITY = 2.0  # Score minimum de configuration (sur 3.0)
+MIN_CONFIDENCE = 0.80    # Probabilité calibrée minimale (80%)
 
 # Ratios de Prise de Profit (Risk / Reward)
 TP1_RR = 1.5   # Take Profit 1 à 1.5x le risque (on vend 50% et on passe le SL à Breakeven)

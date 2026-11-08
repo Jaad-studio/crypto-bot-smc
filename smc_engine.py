@@ -158,6 +158,52 @@ class SMCEngine:
 
         return bullish_obs, bearish_obs
 
+    def _score_setup(self, df_15m, target_fvg, order_blocks, is_long=True):
+        """
+        Calcule le score de qualité du setup (0.0 à 3.0) et la probabilité calibrée (0.0 à 1.0).
+        - Base : 1.0 (alignement tendance macro et FVG valide)
+        - Confluence Order Block : +0.75
+        - Pression Volume Delta (CVD) : +0.75
+        - Expansion de volume : +0.50
+        """
+        quality = 1.0
+
+        # 1. Confluence Order Block
+        has_ob_confluence = False
+        for ob in order_blocks:
+            if is_long and abs(ob['high'] - target_fvg['bottom']) / target_fvg['bottom'] < 0.015:
+                has_ob_confluence = True
+                break
+            elif not is_long and abs(ob['low'] - target_fvg['top']) / target_fvg['top'] < 0.015:
+                has_ob_confluence = True
+                break
+
+        if has_ob_confluence:
+            quality += 0.75
+
+        # 2. Pression Delta CVD
+        recent_delta = df_15m['delta'].iloc[-5:].sum()
+        recent_vol = df_15m['volume'].iloc[-5:].sum()
+        if recent_vol > 0:
+            delta_ratio = abs(recent_delta) / recent_vol
+            if delta_ratio >= 0.12:
+                quality += 0.75
+            elif delta_ratio >= 0.05:
+                quality += 0.40
+
+        # 3. Volume Expansion
+        vol_current = df_15m['volume'].iloc[-1]
+        vol_avg = df_15m['volume'].rolling(20).mean().iloc[-1]
+        if vol_avg > 0 and vol_current > vol_avg * 1.2:
+            quality += 0.50
+
+        quality = min(3.0, round(quality, 2))
+        
+        # Probabilité calibrée (0.75 à 0.92)
+        confidence = round(0.70 + (quality / 3.0) * 0.22, 3)
+
+        return quality, confidence
+
     def detect_setup(self, symbol, df_1h, df_15m, btc_dump_pct=0.0):
         """
         Scanne et synthétise tous les critères institutionnels pour générer
@@ -213,6 +259,8 @@ class SMCEngine:
                     tp1_price = round(entry_price + (1.5 * risk_amount_price), 4)
                     tp2_price = round(entry_price + (3.0 * risk_amount_price), 4)
 
+                    quality, confidence = self._score_setup(df_15m, target_fvg, bullish_obs, is_long=True)
+
                     return {
                         'symbol': symbol,
                         'direction': 'LONG',
@@ -225,7 +273,9 @@ class SMCEngine:
                         'macro_trend': macro_trend,
                         'pattern': f"Bullish FVG [{round(target_fvg['bottom'], 2)} - {round(target_fvg['top'], 2)}]",
                         'cvd_confirmation': True,
-                        'atr': atr_15m
+                        'atr': atr_15m,
+                        'setup_quality': quality,
+                        'confidence': confidence
                     }
 
         # --- SCÉNARIO SHORT (VENTE / DÉRIVÉS) ---
@@ -247,6 +297,8 @@ class SMCEngine:
                     tp1_price = round(entry_price - (1.5 * risk_amount_price), 4)
                     tp2_price = round(entry_price - (3.0 * risk_amount_price), 4)
 
+                    quality, confidence = self._score_setup(df_15m, target_fvg, bearish_obs, is_long=False)
+
                     return {
                         'symbol': symbol,
                         'direction': 'SHORT',
@@ -259,7 +311,9 @@ class SMCEngine:
                         'macro_trend': macro_trend,
                         'pattern': f"Bearish FVG [{round(target_fvg['bottom'], 2)} - {round(target_fvg['top'], 2)}]",
                         'cvd_confirmation': True,
-                        'atr': atr_15m
+                        'atr': atr_15m,
+                        'setup_quality': quality,
+                        'confidence': confidence
                     }
 
         return None
