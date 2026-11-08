@@ -145,7 +145,7 @@ class SMCBotRunner:
                 scan_count += 1
                 now = datetime.now()
                 now_str = now.strftime('%H:%M:%S')
-                print(f"[{now_str}] 🔄 Scan #{scan_count} en cours...")
+                print(f"[{now_str}] 🔄 Scan #{scan_count} en cours...", flush=True)
 
                 # 1. Mise à jour de la revue nocturne quotidienne (23h00 UTC ou après minuit)
                 today = date.today()
@@ -167,6 +167,13 @@ class SMCBotRunner:
                     'reason': regime_snapshot.reason
                 }
 
+                print(
+                    f"[{now_str}] 🌐 Régime Macro : {regime_snapshot.regime.upper()} "
+                    f"(BTC: {regime_snapshot.btc_price}$ | 1H: {regime_snapshot.btc_1h_change_pct:+.2f}% | "
+                    f"Vol: {regime_snapshot.volatility_ratio:.2f}x) -> État Risque: {regime_snapshot.risk_state.upper()}",
+                    flush=True
+                )
+
                 # 4. Vérification Hard Kill-Switch
                 ks_status = self.risk.check_kill_switch()
                 if not ks_status['is_armed_and_safe']:
@@ -183,6 +190,7 @@ class SMCBotRunner:
                     continue
 
                 # 6. Analyse des Paires
+                new_signals_count = 0
                 for symbol in config.PAIRS:
                     if symbol in self.active_positions:
                         continue
@@ -205,6 +213,7 @@ class SMCBotRunner:
                         # Filtrage & Sizing via Risk Layer Déterministe
                         trade_params = self.risk.compute_position_parameters(setup)
                         if trade_params:
+                            new_signals_count += 1
                             # Normalisation types natifs Python
                             clean_params = {}
                             for k, v in trade_params.items():
@@ -224,6 +233,13 @@ class SMCBotRunner:
                                 'entry_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                             }
 
+                finish_str = datetime.now().strftime('%H:%M:%S')
+                print(
+                    f"[{finish_str}] ✅ Scan #{scan_count} terminé : {len(config.PAIRS)} paires analysées | "
+                    f"Nouveaux signaux: {new_signals_count} | Positions actives: {len(self.active_positions)}. "
+                    f"En veille ({config.SCAN_INTERVAL_SECONDS}s)...",
+                    flush=True
+                )
                 time.sleep(config.SCAN_INTERVAL_SECONDS)
 
             except KeyboardInterrupt:
@@ -297,6 +313,50 @@ class SMCBotRunner:
                     total_gain = p['total_projected_profit']
                     tracker.update_trade_progress(symbol, 'TP2_HIT', curr_price, total_gain)
                     msg = f"🚀 TP2 FINAL ATTEINT sur {symbol} à {curr_price}$ ! Gain total : +{total_gain} €. Capital actuel : {self.capital:.2f} €."
+                    logging.info(msg)
+                    self.notifier.send_status_message(f"🏆 TP2 Final Validé : {symbol}", msg, color=0xF59E0B)
+                    del self.active_positions[symbol]
+
+            elif direction == 'SHORT':
+                # Stop Loss touché (prix monte)
+                if curr_price >= sl:
+                    if pos['tp1_hit']:
+                        gain = p['gain_tp1']
+                        self.capital += gain
+                        self.risk.update_capital(self.capital)
+                        tracker.update_trade_progress(symbol, 'SL_BE_HIT', curr_price, gain)
+                        msg = f"🛡️ Position SHORT {symbol} fermée au Breakeven après TP1. Gain sécurisé : +{gain} €."
+                    else:
+                        loss = p['risk_cash']
+                        self.capital -= loss
+                        self.risk.update_capital(self.capital)
+                        tracker.update_trade_progress(symbol, 'SL_LOSS_HIT', curr_price, -loss)
+                        msg = f"🛑 Stop Loss touché sur SHORT {symbol} à {curr_price}$. Perte maîtrisée : -{loss} €."
+
+                    logging.info(msg)
+                    self.notifier.send_status_message(f"Sortie de position : {symbol}", msg, color=0xEF4444)
+                    del self.active_positions[symbol]
+
+                # TP1 touché (prix baisse)
+                elif not pos['tp1_hit'] and curr_price <= tp1:
+                    pos['tp1_hit'] = True
+                    p['sl_price'] = p['entry_price']
+                    gain = p['gain_tp1']
+                    self.capital += gain
+                    self.risk.update_capital(self.capital)
+                    tracker.update_trade_progress(symbol, 'TP1_HIT', curr_price, gain)
+                    msg = f"🎯 TP1 ATTEINT sur SHORT {symbol} à {curr_price}$ ! (+{gain} €). Stop Loss déplacé au Breakeven."
+                    logging.info(msg)
+                    self.notifier.send_status_message(f"🎯 TP1 Atteint : {symbol}", msg, color=0x10B981)
+
+                # TP2 final touché (prix baisse)
+                elif pos['tp1_hit'] and curr_price <= tp2:
+                    gain_tp2 = p['gain_tp2']
+                    self.capital += gain_tp2
+                    self.risk.update_capital(self.capital)
+                    total_gain = p['total_projected_profit']
+                    tracker.update_trade_progress(symbol, 'TP2_HIT', curr_price, total_gain)
+                    msg = f"🚀 TP2 FINAL ATTEINT sur SHORT {symbol} à {curr_price}$ ! Gain total : +{total_gain} €."
                     logging.info(msg)
                     self.notifier.send_status_message(f"🏆 TP2 Final Validé : {symbol}", msg, color=0xF59E0B)
                     del self.active_positions[symbol]
