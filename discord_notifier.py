@@ -47,6 +47,26 @@ class DiscordNotifier:
 
         stars = "⭐️" * int(min(3, max(1, round(setup_quality))))
 
+        # Explication en français simple et vulgarisée
+        if is_long:
+            instruction_title = "💡 CE QUE LE BOT TE CONSEILLE DE FAIRE :"
+            instruction_text = (
+                f"1. **ACHÈTE** `{symbol}` sur Binance au prix de **`{entry} $`** (avec environ **`{notional} $`**).\n"
+                f"2. **METS TA SÉCURITÉ (Stop Loss) :** Si le cours baisse sous **`{sl} $`**, coupe tout (perte limitée à **`-{risk_cash} €`**).\n"
+                f"3. **PRENDS TES BÉNÉFICES (Étape 1) :** Quand le prix monte à **`{tp1} $`**, vends la moitié (50%) pour empocher **`+{trade_params['gain_tp1']} €`**.\n"
+                f"4. **PASSE EN RISQUE ZÉRO (Breakeven) :** Dès que l'étape 1 est validée, remonte ton Stop Loss à **`{entry} $`** (ton prix d'achat) : impossible de perdre le moindre centime !\n"
+                f"5. **OBJECTIF FINAL (Étape 2) :** Vends le reste quand le prix touche **`{tp2} $`** pour empocher **`+{trade_params['gain_tp2']} €`** de plus (Gain total : **`+{trade_params['total_projected_profit']} €`**)."
+            )
+        else:
+            instruction_title = "💡 CE QUE LE BOT TE CONSEILLE DE FAIRE (POSITION SHORT) :"
+            instruction_text = (
+                f"1. **VENDS (SHORT)** `{symbol}` à **`{entry} $`** en pariant sur la baisse.\n"
+                f"2. **METS TA SÉCURITÉ (Stop Loss) :** Si le cours remonte au-dessus de **`{sl} $`**, coupe la position (perte max: **`-{risk_cash} €`**).\n"
+                f"3. **SÉCURISE TES GAINS (Étape 1) :** Dès que le prix descend à **`{tp1} $`**, rachète la moitié pour empocher **`+{trade_params['gain_tp1']} €`**.\n"
+                f"4. **PASSE EN RISQUE ZÉRO :** Déplace aussitôt ton Stop Loss au prix de départ (**`{entry} $`**).\n"
+                f"5. **OBJECTIF FINAL (Étape 2) :** Rachète les 50% restants quand le prix chute à **`{tp2} $`** (Gain total : **`+{trade_params['total_projected_profit']} €`**)."
+            )
+
         embed = {
             "title": f"🟢 SIGNAL ACHAT INSTITUTIONNEL : {symbol}",
             "description": (
@@ -76,23 +96,18 @@ class DiscordNotifier:
                     "inline": True
                 },
                 {
-                    "name": "📊 Score & Calibration IA",
+                    "name": "📊 Score IA & Calibration",
                     "value": f"{stars} **{setup_quality}/3.0** (Confiance: **{confidence_pct}%**)",
                     "inline": True
                 },
                 {
-                    "name": "📐 Position Sizing",
-                    "value": f"{sizing_method}\n**{risk_cash} €** ({trade_params['risk_pct']}%)",
+                    "name": "📐 Taille Recommandée (Kelly)",
+                    "value": f"{sizing_method}\n**{risk_cash} €** risqués",
                     "inline": True
                 },
                 {
-                    "name": "🛡️ Risk Engine & Drawdown",
-                    "value": f"Kill-Switch: **ARMÉ** | DD: **{drawdown_pct}%** (max 15%)",
-                    "inline": False
-                },
-                {
-                    "name": "📱 Exécution Binance Spot :",
-                    "value": f"1. Ouvre Binance ➔ **Trader** ➔ **Spot**\n2. Choisis `{symbol}` ➔ **Acheter**\n3. Active TP/SL : TP `{tp1}` | SL `{sl}`\n4. Montant : `{notional} $` (Risque maximal garanti : {risk_cash} €)",
+                    "name": instruction_title,
+                    "value": instruction_text,
                     "inline": False
                 }
             ],
@@ -208,9 +223,21 @@ class DiscordNotifier:
         print("\n" + "=" * 65)
         print(f"🚨 [NOUVEAU SIGNAL DÉTECTÉ] {p['direction']} sur {p['symbol']}")
         print(f"   Score & Confiance   : {p.get('setup_quality', 2.0)}/3.0 ({round(p.get('confidence', 0.8)*100, 1)}%)")
-        print(f"   Prix Entrée (Limit) : {p['entry_price']}")
-        print(f"   Stop Loss           : {p['sl_price']} (Perte max : -{p['risk_cash']} €)")
-        print(f"   Take Profit 1       : {p['tp1_price']} (Sécurise 50% + SL à Breakeven)")
-        print(f"   Take Profit 2       : {p['tp2_price']} (Objectif final : +{p['total_projected_profit']} €)")
-        print(f"   Sizing & Méthode    : {p.get('sizing_method', 'Kelly')} -> {p['risk_cash']} €")
-        print("=" * 65 + "\n")
+        print(f"   Prix Entrée (Limit) : {p['entry_price']} $")
+        print(f"   Stop Loss           : {p['sl_price']} $ (Perte max : -{p['risk_cash']} €)")
+        print(f"   Take Profit 1       : {p['tp1_price']} $ (Sécurise 50% + SL à Breakeven)")
+        print(f"   Take Profit 2       : {p['tp2_price']} $ (Objectif final : +{p['total_projected_profit']} €)")
+        print(f"   Sizing (Kelly 0.25x): {p['risk_cash']} € risqués ({p.get('notional_value')} $ notionnel)")
+        print("   ---")
+        print(f"   💡 CONSEIL SIMPLE :")
+        if p['direction'] == 'LONG':
+            print(f"   1. Achète {p['symbol']} à {p['entry_price']}$")
+            print(f"   2. Mets le Stop Loss à {p['sl_price']}$")
+            print(f"   3. Dès que ça atteint {p['tp1_price']}$, vends 50% et monte ton SL à {p['entry_price']}$ (risque 0)")
+            print(f"   4. Vends le reste quand ça atteint {p['tp2_price']}$ !")
+        else:
+            print(f"   1. Vends (Short) {p['symbol']} à {p['entry_price']}$")
+            print(f"   2. Mets le Stop Loss à {p['sl_price']}$")
+            print(f"   3. Dès que ça descend à {p['tp1_price']}$, rachète 50% et passe ton SL à {p['entry_price']}$")
+            print(f"   4. Rachète le reste quand ça descend à {p['tp2_price']}$ !")
+        print("=" * 65 + "\n", flush=True)
